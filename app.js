@@ -4,8 +4,7 @@ const cors=require('cors')
 const bodyParser=require('body-parser');
 const crypto=require('crypto');
 
-const host='localhost';
-const port=5000;
+
 
 var mongoose=require('mongoose');
 mongoose.Promise=global.Promise;
@@ -108,8 +107,5 @@ app.delete('/removetask',async (req,res)=>{
     }
 });
 
-app.listen(port,host,function(){
-    console.log("runs in http://" + host+":"+port);
-    console.log(__dirname);
-});
+app.listen();
 
