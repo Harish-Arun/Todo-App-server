@@ -4,7 +4,11 @@ const cors=require('cors')
 const bodyParser=require('body-parser');
 const crypto=require('crypto');
 
+const cookieParser=require("cookie-parser");
+const sessions=require("express-session");
 
+const host='localhost';
+const port=5000;
 
 var mongoose=require('mongoose');
 mongoose.Promise=global.Promise;
@@ -21,7 +25,8 @@ var User=mongoose.model("User",userSchema,"User");
 var todoSchema = new mongoose.Schema({
     task: String,
     due: String,
-    desc: String
+    desc: String,
+    user: String
 })
 var Todo=mongoose.model("Todo",todoSchema,"Todo");
 
@@ -34,6 +39,16 @@ function hashpwd(pwd){
 app.use(cors());
 app.use(bodyParser.json());
 
+const oneDay = 1000 * 60 * 60 * 24;
+app.use(sessions({
+    secret: "thisismysecrctekeyfhrgfgrfrty84fwir767",
+    saveUninitialized:true,
+    cookie: { maxAge: oneDay },
+    resave: false
+}));
+app.use(cookieParser());
+var session;
+
 
 app.post('/auth/login',async (req,res)=>{
     try{
@@ -45,7 +60,9 @@ app.post('/auth/login',async (req,res)=>{
         const person=await User.findOne({email:logger.email});
         console.log(person);
         if(person.password==logger.password){
-            res.status(200).json({"status":"success"});
+            session=req.session;
+            session.user=logger.email;
+            res.status(200).json({"status":"success","user":session.user});
         }
         else{
             res.status(401).json({"status":"failed"});
@@ -66,7 +83,9 @@ app.post('/auth/register',async (req,res)=>{
         };
         await User.create(person);
         console.log(person);
-        res.status(201).json({"status":"success"});
+        session=req.session;
+        session.user=person.email;
+        res.status(201).json({"status":"success","user":session.user});
     }
     catch(err){
         res.status(400).json({"status":"failed"});
@@ -75,7 +94,7 @@ app.post('/auth/register',async (req,res)=>{
 
 app.get('/tasks', async (req,res)=>{
     try{
-        const todos= await Todo.find();
+        const todos= await Todo.find({user:session.user});
         res.status(200).json(todos);
     }
     catch(err){
@@ -85,21 +104,29 @@ app.get('/tasks', async (req,res)=>{
 
 app.post('/tasks', async (req,res)=>{
     try{
-        console.log(req.body);
-        await Todo.create(req.body);
-        const todos= await Todo.find();
+        let data={...req.body,user:session.user};
+        console.log(data);
+        await Todo.create(data);
+        const todos= await Todo.find({user:session.user});
         res.status(200).json(todos);
     }
     catch(err){
         res.status(400);
     }
 });
+
+app.get("/logout",(req,res)=>{
+    req.session.destroy();
+    console.log("Sessoion ended");
+    res.status(200).json({"status":"success"});
+
+})
 
 app.delete('/removetask',async (req,res)=>{
     try{
         console.log(req.body);
         await Todo.deleteOne(req.body);
-        const todos= await Todo.find();
+        const todos= await Todo.find({user:session.user});
         res.status(200).json(todos);
     }
     catch(err){
@@ -107,5 +134,8 @@ app.delete('/removetask',async (req,res)=>{
     }
 });
 
-app.listen();
+app.listen(port,host,function(){
+    console.log("runs in http://" + host+":"+port);
+    console.log(__dirname);
+});
 
